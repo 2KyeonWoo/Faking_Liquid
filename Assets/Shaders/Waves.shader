@@ -4,9 +4,9 @@
 		_MainTex ("Albedo (RGB)", 2D) = "white" {}
 		_Glossiness ("Smoothness", Range(0,1)) = 0.5
 		_Metallic ("Metallic", Range(0,1)) = 0.0
-		_Steepness ("Steepness", Range(0, 1)) = 0.5
-		_WaveLength ("Wavelength", Float) = 10
-		_Direction ("Direction (2D)", Vector) = (1,0,0,0)
+		_WaveA ("Wave A (Dir, Steepness, Wavelength)", Vector) = (1, 0, 0.5, 10)
+		_WaveB ("Wave B", Vector) = (1, 0, 0.5, 10)
+		_WaveC ("Wave C", Vector) = (1, 1, 0.15, 10)
 	}
 	SubShader {
 		Tags { "RenderType"="Opaque" }
@@ -25,32 +25,44 @@
 		half _Glossiness;
 		half _Metallic;
 		fixed4 _Color;
-		float _Steepness, _WaveLength;
-		float2 _Direction;
+		float4 _WaveA, _WaveB, _WaveC;
+
+		float3 GerstnerWave(float4 wave, float3 p, inout float3 tangent, inout float3 binormal) {
+			float steepness = wave.z;
+			float wavelength = wave.w;
+			float k = 2 * UNITY_PI / wavelength;
+			float c = sqrt(9.8 / k);
+			float2 d = normalize(wave.xy);
+			float f = k * (dot(d, p.xz) - c * _Time.y);
+			float a = steepness / k;
+
+			tangent += float3(
+				-d.x * d.x * (steepness * sin(f)),
+				d.x * (steepness * cos(f)),
+				-d.x * d.y * (steepness * sin(f))
+			);
+			binormal += float3(
+				-d.x * d.y * (steepness * sin(f)),
+				d.y * (steepness * cos(f)),
+				-d.y * d.y * (steepness * sin(f))
+			);
+			return float3(
+				d.x * (a * cos(f)),
+				a * sin(f),
+				d.y * (a * cos(f))
+			);
+		}
 
 		void vert (inout appdata_full vertexData) {
-			float3 p = vertexData.vertex.xyz;
+			float3 gridPoint = vertexData.vertex.xyz;
+			float3 tangent = float3(1, 0, 0);
+			float3 binormal = float3(0, 0, 1);
+			float3 p = gridPoint;
 
-			float k = 2 * UNITY_PI / _WaveLength;
-			float c = sqrt(9.8 / k);
-			float2 d = normalize(_Direction);
-			float f = k * (dot(d, p.xz) - c * _Time.y);
-			float a = _Steepness / k;
+			p += GerstnerWave(_WaveA, gridPoint, tangent, binormal);
+			p += GerstnerWave(_WaveB, gridPoint, tangent, binormal);
+			p += GerstnerWave(_WaveC, gridPoint, tangent, binormal);
 
-			p.x += d.x * (a * cos(f));
-			p.y = a * sin(f);
-			p.z += d.y * (a * cos(f));
-
-			float3 tangent = float3(
-				1 - d.x * d.x * (_Steepness * sin(f)),
-				d.x * (_Steepness * cos(f)),
-				-d.x * d.y * (_Steepness * sin(f))
-			);
-			float3 binormal = float3(
-				-d.x * d.y * (_Steepness * sin(f)),
-				d.y * (_Steepness * cos(f)),
-				1 - d.y * d.y * (_Steepness * sin(f))
-			);
 			float3 normal = normalize(cross(binormal, tangent));
 
 			vertexData.vertex.xyz = p;
