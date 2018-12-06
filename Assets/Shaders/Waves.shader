@@ -4,7 +4,6 @@
 		_MainTex ("Albedo (RGB)", 2D) = "white" {}
 		_Glossiness ("Smoothness", Range(0,1)) = 0.5
 		_Metallic ("Metallic", Range(0,1)) = 0.0
-		_Amplitude ("Amplitude", Float) = 1
 		_WaveLength ("Wavelength", Float) = 10
 		_Speed ("Speed", Float) = 1
 	}
@@ -25,16 +24,23 @@
 		half _Glossiness;
 		half _Metallic;
 		fixed4 _Color;
-		float _Amplitude, _WaveLength, _Speed;
+		float _Steepness, _WaveLength;
 
 		void vert (inout appdata_full vertexData) {
 			float3 p = vertexData.vertex.xyz;
 
 			float k = 2 * UNITY_PI / _WaveLength;
-			float f = k * (p.x - _Speed * _Time.y);
-			p.y = _Amplitude * sin(f);
+			float c = sqrt(9.8 / k);
+			float f = k * (p.x - c * _Time.y);
+			float a = _Steepness / k;
+			p.x += a * cos(f);
+			p.y = a * sin(f);
 
-			float3 tangent = normalize(float3(1, k * _Amplitude * cos(f), 0));
+			float3 tangent = normalize(float3(
+				1 - _Steepness * sin(f),
+				_Steepness * cos(f), 
+				0
+				));
 			float3 normal = float3(-tangent.y, tangent.x, 0);
 
 			vertexData.vertex.xyz = p;
